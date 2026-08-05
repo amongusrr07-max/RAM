@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RANDOM ACCESS MUSIC — 音楽ルーレット</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #121114;
+    --panel: #1c1a1f;
+    --panel-raised: #24222a;
+    --vinyl-amber: #e8a33d;
+    --vinyl-red: #d0503a;
+    --vinyl-pink: #d0507a;
+    --paper: #f1e9d8;
+    --paper-dim: #cfc6b1;
+    --text-muted: #94909a;
+    --line: #37343d;
+    --focus: #e8a33d;
+  }
+  *{ box-sizing: border-box; }
+  html{ scroll-behavior: smooth; }
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, #201e26 0%, var(--bg) 60%),
+      var(--bg);
+    color: var(--paper);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: 48px 20px 80px;
+  }
+  ::selection{ background: var(--vinyl-amber); color: #1a1710; }
+  *:focus-visible{ outline: 2px solid var(--focus); outline-offset: 3px; }
+
+  .eyebrow{
+    font-family:'Space Mono', monospace;
+    letter-spacing: 0.25em;
+    font-size: 11px;
+    color: var(--vinyl-amber);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .conn-dot{ width:7px; height:7px; border-radius:50%; background:#555; }
+  .conn-dot.on{ background:#5fd67c; box-shadow:0 0 6px #5fd67c; }
+  h1{
+    font-family:'Archivo Black', sans-serif;
+    font-size: clamp(30px, 6vw, 52px);
+    line-height: 1.05;
+    margin: 0 0 10px;
+    text-align:center;
+    letter-spacing: -0.01em;
+  }
+  h1 span{ color: var(--vinyl-amber); }
+  .sub{
+    color: var(--text-muted);
+    font-size: 15px;
+    text-align:center;
+    max-width: 460px;
+    margin: 0 0 36px;
+    line-height:1.7;
+  }
+
+  .genre-bar{
+    display:flex; flex-wrap: wrap; gap: 8px; justify-content:center;
+    max-width: 420px; margin-bottom: 30px;
+  }
+  .genre-chip{
+    font-family:'Space Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
+    background: var(--panel); border: 1px solid var(--line); color: var(--text-muted);
+    padding: 7px 13px; border-radius: 20px; cursor:pointer; transition: all 0.15s ease;
+  }
+  .genre-chip:hover{ border-color: var(--vinyl-amber); color: var(--paper); }
+  .genre-chip.active{ background: var(--vinyl-amber); border-color: var(--vinyl-amber); color: #1a1710; font-weight: 700; }
+
+  .deck{
+    width: min(420px, 92vw);
+    background: linear-gradient(180deg, var(--panel-raised), var(--panel));
+    border: 1px solid var(--line); border-radius: 14px; padding: 26px 22px;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03);
+    position: relative;
+  }
+  .status-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:'Space Mono', monospace; font-size: 11px; color: var(--text-muted);
+    letter-spacing:0.1em; margin-bottom: 18px;
+  }
+  .status-pill{
+    background:#0f0d12; border-radius:4px; padding: 3px 8px; color: var(--vinyl-amber);
+    font-weight:700; border: 1px solid var(--line);
+  }
+
+  .turntable{
+    background:#0f0d12; border-radius: 10px; padding: 28px; border: 1px solid var(--line);
+    margin-bottom: 20px; display:flex; justify-content:center; align-items:center;
+    position: relative; min-height: 210px;
+  }
+  .vinyl{
+    width: 190px; height: 190px; border-radius:50%;
+    background: repeating-radial-gradient(circle at 50% 50%, #0a090c 0 3px, #201e24 3px 5px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.5), inset 0 0 0 1px #000;
+    display:flex; align-items:center; justify-content:center; transition: transform 0.2s linear;
+  }
+  .vinyl.spinning{ animation: spin 0.9s linear infinite; }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .vinyl-label{
+    width: 78px; height: 78px; border-radius:50%; background: var(--vinyl-amber);
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+    border: 2px solid #0a090c; position:relative;
+  }
+  .vinyl-label img{ width:100%; height:100%; object-fit:cover; }
+  .vinyl-label .init{ font-family:'Archivo Black', sans-serif; font-size: 22px; color:#1a1710; }
+
+  .tonearm{
+    position:absolute; top: 18px; right: 22px; width: 60px; height: 60px;
+    opacity: 0.9; transform-origin: 90% 10%; transition: transform 0.4s ease;
+  }
+  .tonearm.down{ transform: rotate(18deg); }
+  .tonearm svg{ width:100%; height:100%; }
+
+  .result-card{
+    background: var(--paper); color: #1a1710; border-radius: 8px; padding: 18px;
+    min-height: 100px; display:flex; flex-direction:column; justify-content:center; gap: 10px;
+    position:relative; overflow:hidden; border: 1px solid #00000022;
+  }
+  .result-empty{ font-family:'Space Mono', monospace; font-size: 13px; color: #8a8065; }
+  .result-top{ display:flex; gap: 14px; align-items:center; }
+  .result-art{
+    width: 56px; height: 56px; border-radius: 6px; background: var(--vinyl-amber);
+    flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center;
+  }
+  .result-art img{ width:100%; height:100%; object-fit:cover; }
+  .result-art .init{ font-family:'Archivo Black', sans-serif; font-size:18px; color:#1a1710; }
+  .result-text{ flex:1; min-width:0; }
+  .result-artist{ font-family:'Space Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6252; margin-bottom: 3px; }
+  .result-album{ font-family:'Archivo Black', sans-serif; font-size: clamp(17px, 4vw, 22px); line-height:1.15; }
+  .result-genre{ display:inline-block; font-family:'Space Mono', monospace; font-size: 10px; color: #6b6252; border: 1px solid #6b625244; padding: 2px 8px; border-radius: 20px; margin-top: 4px; }
+  .result-actions{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .spotify-btn{
+    display:inline-flex; align-items:center; gap: 6px; background: #1DB954; color: #06210f;
+    text-decoration:none; font-family:'Space Mono', monospace; font-size: 11px; font-weight:700;
+    padding: 8px 12px; border-radius: 20px; letter-spacing: 0.04em; border:none; cursor:pointer;
+  }
+  .spotify-btn:hover{ filter: brightness(1.08); }
+  .like-btn{
+    display:inline-flex; align-items:center; gap: 6px; background: #fff; color:#1a1710;
+    border: 1px solid #00000022; font-family:'Space Mono', monospace; font-size: 11px; font-weight:700;
+    padding: 8px 12px; border-radius: 20px; cursor:pointer;
+  }
+  .like-btn.liked{ background: var(--vinyl-pink); color:#fff; border-color: var(--vinyl-pink); }
+
+  .fade-in{ animation: fadeIn 0.4s ease both; }
+  @keyframes fadeIn{ from{ opacity:0; transform: translateY(4px);} to{ opacity:1; transform:none; } }
+
+  .spin-btn{
+    width:100%; margin-top: 18px; padding: 16px 20px; border-radius: 8px; border: none;
+    background: var(--vinyl-amber); color: #1a1710; font-family:'Archivo Black', sans-serif;
+    font-size: 15px; letter-spacing: 0.02em; cursor:pointer;
+    transition: transform 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+    box-shadow: 0 6px 0 #a3701f;
+  }
+  .spin-btn:hover{ background:#f0b455; }
+  .spin-btn:active{ transform: translateY(4px); box-shadow: 0 2px 0 #a3701f; }
+  .spin-btn:disabled{ opacity:0.6; cursor:default; transform:none; box-shadow: 0 6px 0 #a3701f; }
+
+  .library{ width: min(420px, 92vw); margin-top: 34px; }
+  .lib-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; }
+  .lib-title{ font-family:'Space Mono', monospace; font-size: 12px; letter-spacing: 0.16em; color: var(--text-muted); text-transform:uppercase; }
+  .add-toggle{ background:none; border: 1px solid var(--line); color: var(--paper-dim); font-family:'Space Mono', monospace; font-size: 11px; padding: 6px 10px; border-radius: 6px; cursor:pointer; }
+  .add-toggle:hover{ border-color: var(--vinyl-amber); color: var(--vinyl-amber); }
+
+  .add-form{ display:none; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; gap: 8px; }
+  .add-form.open{ display:flex; flex-direction:column; }
+  .add-form input{ background:#0f0d12; border: 1px solid var(--line); color: var(--paper); padding: 10px; border-radius: 6px; font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 14px; }
+  .add-form input::placeholder{ color: #66606e; }
+  .add-form button{ background: var(--vinyl-red); color: var(--paper); border:none; border-radius:6px; padding: 10px; font-family:'Space Mono', monospace; font-size: 12px; letter-spacing: 0.08em; cursor:pointer; }
+  .add-form button:hover{ filter: brightness(1.1); }
+  .add-form button:disabled{ opacity: 0.6; cursor: default; }
+  .form-note{ font-size:11px; color: var(--text-muted); line-height:1.5; }
+
+  .album-list{ display:flex; flex-direction:column; gap:6px; max-height: 420px; overflow-y:auto; }
+  .album-row{ background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow:hidden; }
+  .row-main{ display:flex; justify-content:space-between; align-items:center; padding: 9px 10px; gap: 10px; cursor:pointer; }
+  .row-main .thumb{ width: 34px; height: 34px; border-radius: 5px; background: var(--vinyl-amber); flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .row-main .thumb img{ width:100%; height:100%; object-fit:cover; }
+  .row-main .thumb .init{ font-family:'Archivo Black', sans-serif; font-size:12px; color:#1a1710; }
+  .row-main .meta{ flex:1; min-width:0; }
+  .row-main .a{ color: var(--text-muted); font-size:10px; font-family:'Space Mono', monospace; }
+  .row-main .t{ color: var(--paper); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row-right{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .tag{ font-family:'Space Mono', monospace; font-size: 9px; color: var(--vinyl-amber); border: 1px solid var(--vinyl-amber); padding: 2px 6px; border-radius: 20px; white-space:nowrap; }
+  .mini-like{ font-family:'Space Mono', monospace; font-size: 10px; color: var(--vinyl-pink); }
+  .del-btn{ background:none; border: 1px solid var(--line); color: var(--text-muted); width: 24px; height: 24px; border-radius: 50%; cursor:pointer; font-size: 13px; line-height:1; flex-shrink:0; }
+  .del-btn:hover{ border-color: var(--vinyl-red); color: var(--vinyl-red); }
+
+  .comments-panel{ display:none; padding: 10px 12px 14px; border-top: 1px solid var(--line); background:#17151a; }
+  .comments-panel.open{ display:block; }
+  .comment-item{ font-size:12px; color: var(--paper-dim); padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .comment-item:last-child{ border-bottom:none; }
+  .comment-form{ display:flex; gap:6px; margin-top:8px; }
+  .comment-form input{ flex:1; background:#0f0d12; border: 1px solid var(--line); color: var(--paper); padding: 7px 9px; border-radius: 6px; font-size:12px; }
+  .comment-form button{ background: var(--vinyl-amber); border:none; color:#1a1710; border-radius:6px; padding: 0 12px; font-size:11px; font-family:'Space Mono', monospace; cursor:pointer; }
+  .rate-note{ font-family:'Space Mono', monospace; font-size:10px; color: var(--vinyl-red); margin-top:2px; }
+
+  footer{ margin-top: 40px; font-family:'Space Mono', monospace; font-size: 11px; color: #56515c; text-align:center; }
+
+  @media (prefers-reduced-motion: reduce){ .vinyl.spinning{ animation: none; } .fade-in{ animation: none; } }
+</style>
+</head>
+<body>
+
+  <div class="eyebrow"><span class="conn-dot" id="connDot"></span>RANDOM ACCESS MUSIC</div>
+  <h1>今日は何を<span>聴く</span>？</h1>
+  <p class="sub">迷ったらボタンを回すだけ。棚の中からランダムに1枚を引き当てる、音楽版ガチャ。追加・いいね・コメント、みんなで育てる棚。</p>
+
+  <div class="genre-bar" id="genreBar"></div>
+
+  <div class="deck">
+    <div class="status-row">
+      <span>NOW SPINNING</span>
+      <span class="status-pill" id="statusPill">READY</span>
+    </div>
+
+    <div class="turntable">
+      <div class="tonearm" id="tonearm">
+        <svg viewBox="0 0 60 60" fill="none">
+          <circle cx="52" cy="8" r="6" fill="#2c2a32" stroke="#0a090c" stroke-width="2"/>
+          <line x1="52" y1="8" x2="14" y2="50" stroke="#2c2a32" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="14" cy="50" r="3" fill="#e8a33d"/>
+        </svg>
+      </div>
+      <div class="vinyl" id="vinyl">
+        <div class="vinyl-label" id="vinylLabel"><span class="init">?</span></div>
+      </div>
+    </div>
+
+    <div class="result-card" id="resultCard">
+      <div class="result-empty" id="resultEmpty">▶ ボタンを押して1枚引く</div>
+    </div>
+
+    <button class="spin-btn" id="spinBtn">🎲 ルーレットを回す</button>
+  </div>
+
+  <div class="library">
+    <div class="lib-head">
+      <span class="lib-title">Library <span id="libCount"></span></span>
+      <button class="add-toggle" id="addToggle">+ アルバムを追加</button>
+    </div>
+
+    <div class="add-form" id="addForm">
+      <input id="inArtist" placeholder="アーティスト名" />
+      <input id="inAlbum" placeholder="アルバム名" />
+      <input id="inGenre" placeholder="ジャンル（例：IDM、Hip-Hop）任意" />
+      <button id="addBtn">追加してターンテーブルに登録</button>
+      <div class="form-note" id="formNote">※ ジャケット画像はiTunesから自動取得するよ。追加は1人につき週1回まで。みんなの棚に反映されるよ🌍</div>
+    </div>
+
+    <div class="album-list" id="albumList"></div>
+  </div>
+
+  <footer>RANDOM ACCESS MUSIC — v0.3 (Firebase)</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-firestore-compat.min.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDXJy9KL8lbZAfS1-GuPrKC9NGKra9I43Q",
+    authDomain: "random-access-music.firebaseapp.com",
+    projectId: "random-access-music",
+    storageBucket: "random-access-music.firebasestorage.app",
+    messagingSenderId: "323640020896",
+    appId: "1:323640020896:web:0f5016067aa275bdb09ec5",
+    measurementId: "G-HJCB6JH05T"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const FieldValue = firebase.firestore.FieldValue;
+
+  const BASE_ALBUMS = [
+    { artist: "Aphex Twin", album: "Selected Ambient Works 85–92", genre: "IDM" },
+    { artist: "Aphex Twin", album: "Drukqs", genre: "IDM" },
+    { artist: "Squarepusher", album: "Feed Me Weird Things", genre: "IDM" },
+    { artist: "Madvillain (MF DOOM)", album: "Madvillainy", genre: "Hip-Hop" },
+    { artist: "Nujabes", album: "Modal Soul", genre: "Hip-Hop" },
+    { artist: "Yellow Magic Orchestra", album: "Solid State Survivor", genre: "Electronic" },
+    { artist: "Thundercat", album: "Drunk", genre: "Funk" },
+    { artist: "Cigarettes After Sex", album: "Cigarettes After Sex", genre: "Dream Pop" },
+    { artist: "平沢進", album: "現象の花園", genre: "Electronic" },
+    { artist: "Boards of Canada", album: "Music Has the Right to Children", genre: "IDM" },
+    { artist: "Basement Jaxx", album: "Kish Kash", genre: "Electronic" },
+    { artist: "Error", album: "Cyber Roach (Original Soundtrack)", genre: "Cyberpunk" },
+  ];
+
+  // ---------- DOM refs ----------
+  const connDot = document.getElementById('connDot');
+  const genreBar = document.getElementById('genreBar');
+  const statusPill = document.getElementById('statusPill');
+  const vinyl = document.getElementById('vinyl');
+  const vinylLabel = document.getElementById('vinylLabel');
+  const tonearm = document.getElementById('tonearm');
+  const resultCard = document.getElementById('resultCard');
+  const spinBtn = document.getElementById('spinBtn');
+  const addToggle = document.getElementById('addToggle');
+  const addForm = document.getElementById('addForm');
+  const addBtn = document.getElementById('addBtn');
+  const inArtist = document.getElementById('inArtist');
+  const inAlbum = document.getElementById('inAlbum');
+  const inGenre = document.getElementById('inGenre');
+  const formNote = document.getElementById('formNote');
+  const albumListEl = document.getElementById('albumList');
+  const libCountEl = document.getElementById('libCount');
+
+  let uid = null;
+  let albums = [];
+  let spinning = false;
+  let activeGenre = 'ALL';
+  let expandedId = null;
+  const artworkCache = {};
+
+  function initials(str){ return (str || '').trim().slice(0,1).toUpperCase() || '?'; }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function spotifyUrl(artist, album){ return `https://open.spotify.com/search/${encodeURIComponent(artist + ' ' + album)}`; }
+
+  // ---------- iTunes JSONP artwork fetch ----------
+  let jsonpCounter = 0;
+  function itunesJsonp(term){
+    return new Promise((resolve) => {
+      const cbName = `__itunesCb${Date.now()}_${jsonpCounter++}`;
+      const script = document.createElement('script');
+      let settled = false;
+      const cleanup = () => { delete window[cbName]; script.remove(); };
+      window[cbName] = (data) => { if (settled) return; settled = true; cleanup(); resolve(data); };
+      script.src = `https://itunes.apple.com/search?term=${term}&entity=album&limit=1&callback=${cbName}`;
+      script.onerror = () => { if (settled) return; settled = true; cleanup(); resolve(null); };
+      setTimeout(() => { if (settled) return; settled = true; cleanup(); resolve(null); }, 6000);
+      document.body.appendChild(script);
+    });
+  }
+  async function fetchArtwork(artist, album){
+    const key = `${artist}|${album}`;
+    if (key in artworkCache) return artworkCache[key];
+    try{
+      const term = encodeURIComponent(`${artist} ${album}`);
+      const data = await itunesJsonp(term);
+      if (data && data.results && data.results[0] && data.results[0].artworkUrl100){
+        const url = data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+        artworkCache[key] = url;
+        return url;
+      }
+    }catch(e){ /* fall back silently */ }
+    artworkCache[key] = null;
+    return null;
+  }
+
+  // ---------- rate limiting (1 add / 1 delete per 7 days per uid) ----------
+  async function canPerform(action){
+    const ref = db.collection('users').doc(uid);
+    const snap = await ref.get();
+    const field = action === 'add' ? 'lastAdd' : 'lastDelete';
+    if (!snap.exists || !snap.data()[field]) return { ok: true };
+    const lastMs = snap.data()[field].toMillis();
+    const diffDays = (Date.now() - lastMs) / 86400000;
+    if (diffDays < 7) return { ok: false, remaining: Math.ceil(7 - diffDays) };
+    return { ok: true };
+  }
+  async function recordAction(action){
+    const ref = db.collection('users').doc(uid);
+    const field = action === 'add' ? 'lastAdd' : 'lastDelete';
+    await ref.set({ [field]: FieldValue.serverTimestamp() }, { merge: true });
+  }
+
+  // ---------- seed base albums (only once, if collection empty) ----------
+  async function seedIfEmpty(){
+    const snap = await db.collection('albums').get();
+    if (!snap.empty) return;
+    for (const a of BASE_ALBUMS){
+      await db.collection('albums').add({
+        ...a, isBase: true, artworkUrl: null, likes: 0, likedBy: [], createdAt: FieldValue.serverTimestamp()
+      });
+    }
+  }
+
+  // ---------- realtime library listener ----------
+  function listenLibrary(){
+    db.collection('albums').orderBy('createdAt', 'asc').onSnapshot((snap) => {
+      albums = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      albums.forEach(a => {
+        const key = `${a.artist}|${a.album}`;
+        if (a.artworkUrl && !(key in artworkCache)) artworkCache[key] = a.artworkUrl;
+      });
+      renderGenreBar();
+      renderList();
+    }, (err) => {
+      connDot.classList.remove('on');
+      albumListEl.innerHTML = `<div class="result-empty">読み込みエラー: ${escapeHtml(err.message)}</div>`;
+    });
+  }
+
+  function pool(){
+    if (activeGenre === 'ALL') return albums;
+    return albums.filter(a => a.genre === activeGenre);
+  }
+
+  function renderGenreBar(){
+    const genres = ['ALL', ...new Set(albums.map(a => a.genre).filter(Boolean))];
+    genreBar.innerHTML = '';
+    genres.forEach(g => {
+      const chip = document.createElement('button');
+      chip.className = 'genre-chip' + (g === activeGenre ? ' active' : '');
+      chip.textContent = g;
+      chip.addEventListener('click', () => { activeGenre = g; renderGenreBar(); });
+      genreBar.appendChild(chip);
+    });
+  }
+
+  function labelHtml(item){
+    const key = `${item.artist}|${item.album}`;
+    const url = artworkCache[key] || item.artworkUrl;
+    if (url) return `<img src="${url}" alt="" loading="lazy" />`;
+    return `<span class="init">${escapeHtml(initials(item.album))}</span>`;
+  }
+
+  function renderList(){
+    libCountEl.textContent = `(${albums.length})`;
+    albumListEl.innerHTML = '';
+    albums.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'album-row';
+      row.innerHTML = `
+        <div class="row-main" data-id="${item.id}">
+          <div class="thumb">${labelHtml(item)}</div>
+          <div class="meta">
+            <div class="a">${escapeHtml(item.artist)}</div>
+            <div class="t">${escapeHtml(item.album)}</div>
+          </div>
+          <div class="row-right">
+            ${item.likes ? `<span class="mini-like">❤ ${item.likes}</span>` : ''}
+            ${item.genre ? `<span class="tag">${escapeHtml(item.genre)}</span>` : ''}
+            ${!item.isBase ? `<button class="del-btn" data-id="${item.id}" title="削除">×</button>` : ''}
+          </div>
+        </div>
+        <div class="comments-panel ${expandedId === item.id ? 'open' : ''}" id="comments-${item.id}"></div>
+      `;
+      albumListEl.appendChild(row);
+    });
+
+    albumListEl.querySelectorAll('.row-main').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.del-btn')) return;
+        toggleComments(el.dataset.id);
+      });
+    });
+    albumListEl.querySelectorAll('.del-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await handleDelete(btn.dataset.id);
+      });
+    });
+
+    if (expandedId) renderComments(expandedId);
+  }
+
+  async function toggleComments(id){
+    expandedId = expandedId === id ? null : id;
+    renderList();
+  }
+
+  async function renderComments(albumId){
+    const panel = document.getElementById(`comments-${albumId}`);
+    if (!panel) return;
+    panel.classList.add('open');
+    panel.innerHTML = `<div class="comment-item">読み込み中…</div>`;
+    try{
+      const snap = await db.collection('albums').doc(albumId).collection('comments').orderBy('createdAt', 'desc').get();
+      const comments = snap.docs.map(d => d.data());
+      panel.innerHTML = `
+        ${comments.length ? comments.map(c => `<div class="comment-item">${escapeHtml(c.text)}</div>`).join('') : '<div class="comment-item">まだコメントないよ</div>'}
+        <div class="comment-form">
+          <input type="text" placeholder="一言コメント…" id="commentInput-${albumId}" maxlength="140" />
+          <button id="commentBtn-${albumId}">送信</button>
+        </div>
+      `;
+      document.getElementById(`commentBtn-${albumId}`).addEventListener('click', () => submitComment(albumId));
+      document.getElementById(`commentInput-${albumId}`).addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitComment(albumId);
+      });
+    }catch(e){
+      panel.innerHTML = `<div class="comment-item">読み込みエラー</div>`;
+    }
+  }
+
+  async function submitComment(albumId){
+    const input = document.getElementById(`commentInput-${albumId}`);
+    const text = input.value.trim();
+    if (!text) return;
+    input.disabled = true;
+    try{
+      await db.collection('albums').doc(albumId).collection('comments').add({ text, uid, createdAt: FieldValue.serverTimestamp() });
+      input.value = '';
+      renderComments(albumId);
+    }catch(e){ /* ignore */ }
+    input.disabled = false;
+  }
+
+  async function handleDelete(id){
+    const check = await canPerform('delete');
+    if (!check.ok){
+      alert(`削除は週1回まで！あと${check.remaining}日待ってね🙏`);
+      return;
+    }
+    if (!confirm('このアルバムを棚から削除する？')) return;
+    await db.collection('albums').doc(id).delete();
+    await recordAction('delete');
+  }
+
+  async function toggleLike(albumId, currentlyLiked){
+    const ref = db.collection('albums').doc(albumId);
+    await ref.update({
+      likes: FieldValue.increment(currentlyLiked ? -1 : 1),
+      likedBy: currentlyLiked ? FieldValue.arrayRemove(uid) : FieldValue.arrayUnion(uid)
+    });
+  }
+
+  // ---------- spin ----------
+  async function spin(){
+    if (spinning) return;
+    const candidates = pool();
+    if (candidates.length === 0){
+      resultCard.innerHTML = `<div class="result-empty">このジャンルにはまだアルバムがないみたい…「ALL」に戻すか、追加してみて🎧</div>`;
+      return;
+    }
+    spinning = true;
+    spinBtn.disabled = true;
+    vinyl.classList.add('spinning');
+    tonearm.classList.add('down');
+    statusPill.textContent = 'SEEKING…';
+    resultCard.innerHTML = '<div class="result-empty">選んでる...</div>';
+
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    const artworkPromise = fetchArtwork(pick.artist, pick.album);
+
+    await new Promise(r => setTimeout(r, 1100));
+    const url = await artworkPromise;
+    if (url && !pick.artworkUrl){
+      db.collection('albums').doc(pick.id).update({ artworkUrl: url }).catch(()=>{});
+    }
+
+    vinyl.classList.remove('spinning');
+    tonearm.classList.remove('down');
+    statusPill.textContent = 'PLAYING';
+    vinylLabel.innerHTML = labelHtml(pick);
+
+    const liked = uid && (pick.likedBy || []).includes(uid);
+    resultCard.innerHTML = `
+      <div class="result-top fade-in">
+        <div class="result-art">${labelHtml(pick)}</div>
+        <div class="result-text">
+          <div class="result-artist">${escapeHtml(pick.artist)}</div>
+          <div class="result-album">${escapeHtml(pick.album)}</div>
+          ${pick.genre ? `<span class="result-genre">${escapeHtml(pick.genre)}</span>` : ''}
+        </div>
+      </div>
+      <div class="result-actions fade-in">
+        <a class="spotify-btn" href="${spotifyUrl(pick.artist, pick.album)}" target="_blank" rel="noopener noreferrer">▶ Spotifyで聴く</a>
+        <button class="like-btn ${liked ? 'liked' : ''}" id="resultLikeBtn">❤ ${pick.likes || 0}</button>
+      </div>
+    `;
+    document.getElementById('resultLikeBtn').addEventListener('click', async (e) => {
+      const isLiked = e.target.classList.contains('liked');
+      await toggleLike(pick.id, isLiked);
+    });
+
+    spinning = false;
+    spinBtn.disabled = false;
+  }
+
+  spinBtn.addEventListener('click', spin);
+  addToggle.addEventListener('click', () => addForm.classList.toggle('open'));
+
+  addBtn.addEventListener('click', async () => {
+    const artist = inArtist.value.trim();
+    const album = inAlbum.value.trim();
+    const genre = inGenre.value.trim();
+    if (!artist || !album) return;
+
+    const check = await canPerform('add');
+    if (!check.ok){
+      formNote.textContent = `追加は週1回まで！あと${check.remaining}日待ってね🙏`;
+      return;
+    }
+
+    addBtn.disabled = true;
+    formNote.textContent = 'ジャケット画像を探してる…🔍';
+    const artworkUrl = await fetchArtwork(artist, album);
+
+    await db.collection('albums').add({
+      artist, album, genre: genre || 'その他', isBase: false,
+      artworkUrl: artworkUrl || null, likes: 0, likedBy: [],
+      addedBy: uid, createdAt: FieldValue.serverTimestamp()
+    });
+    await recordAction('add');
+
+    inArtist.value = ''; inAlbum.value = ''; inGenre.value = '';
+    addBtn.disabled = false;
+    formNote.textContent = artworkUrl ? '追加できたよ！ジャケットも見つかった📀' : '追加できたよ！ジャケットは見つからなかったから代用ラベルで表示するよ';
+  });
+
+  // ---------- boot ----------
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) { auth.signInAnonymously().catch(() => { connDot.classList.remove('on'); }); return; }
+    uid = user.uid;
+    connDot.classList.add('on');
+    try{
+      await seedIfEmpty();
+      listenLibrary();
+    }catch(e){
+      resultCard.innerHTML = `<div class="result-empty">Firebase接続エラー: ${escapeHtml(e.message)}</div>`;
+    }
+  });
+  auth.signInAnonymously().catch(() => {});
+</script>
+</body>
+</html>
