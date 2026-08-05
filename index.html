@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RANDOM ACCESS MUSIC — 音楽ルーレット</title>
+<meta name="description" content="今日は何を聴く？ボタンを押すだけでランダムに1枚のアルバムを引き当てる音楽ルーレット。みんなでアルバムを追加・いいね・コメントして育てる音楽棚。">
+<meta property="og:title" content="RANDOM ACCESS MUSIC">
+<meta property="og:description" content="迷ったらボタンを回すだけ。音楽版ガチャで新しい1枚と出会おう。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -14,6 +17,7 @@
     --vinyl-amber: #e8a33d;
     --vinyl-red: #d0503a;
     --vinyl-pink: #d0507a;
+    --vinyl-blue: #4a90c4;
     --paper: #f1e9d8;
     --paper-dim: #cfc6b1;
     --text-muted: #94909a;
@@ -37,6 +41,16 @@
   }
   ::selection{ background: var(--vinyl-amber); color: #1a1710; }
   *:focus-visible{ outline: 2px solid var(--focus); outline-offset: 3px; }
+
+  .top-bar{
+    position: fixed; top: 14px; left: 14px; z-index: 50;
+  }
+  .howto-btn{
+    font-family:'Space Mono', monospace; font-size: 11px; letter-spacing: 0.05em;
+    background: var(--panel); border: 1px solid var(--line); color: var(--paper-dim);
+    padding: 8px 12px; border-radius: 20px; cursor:pointer;
+  }
+  .howto-btn:hover{ border-color: var(--vinyl-amber); color: var(--vinyl-amber); }
 
   .eyebrow{
     font-family:'Space Mono', monospace;
@@ -99,7 +113,7 @@
   .turntable{
     background:#0f0d12; border-radius: 10px; padding: 28px; border: 1px solid var(--line);
     margin-bottom: 20px; display:flex; justify-content:center; align-items:center;
-    position: relative; min-height: 210px;
+    position: relative; min-height: 210px; cursor: pointer;
   }
   .vinyl{
     width: 190px; height: 190px; border-radius:50%;
@@ -117,6 +131,7 @@
   }
   .vinyl-label img{ width:100%; height:100%; object-fit:cover; }
   .vinyl-label .init{ font-family:'Archivo Black', sans-serif; font-size: 22px; color:#1a1710; }
+  .vinyl-label .emoji{ font-size: 34px; }
 
   .tonearm{
     position:absolute; top: 18px; right: 22px; width: 60px; height: 60px;
@@ -128,9 +143,9 @@
   .result-card{
     background: var(--paper); color: #1a1710; border-radius: 8px; padding: 18px;
     min-height: 100px; display:flex; flex-direction:column; justify-content:center; gap: 10px;
-    position:relative; overflow:hidden; border: 1px solid #00000022;
+    position:relative; overflow:hidden; border: 1px solid #00000022; cursor:pointer;
   }
-  .result-empty{ font-family:'Space Mono', monospace; font-size: 13px; color: #8a8065; }
+  .result-empty{ font-family:'Space Mono', monospace; font-size: 13px; color: #8a8065; cursor: default; }
   .result-top{ display:flex; gap: 14px; align-items:center; }
   .result-art{
     width: 56px; height: 56px; border-radius: 6px; background: var(--vinyl-amber);
@@ -138,23 +153,12 @@
   }
   .result-art img{ width:100%; height:100%; object-fit:cover; }
   .result-art .init{ font-family:'Archivo Black', sans-serif; font-size:18px; color:#1a1710; }
+  .result-art .emoji{ font-size: 26px; }
   .result-text{ flex:1; min-width:0; }
   .result-artist{ font-family:'Space Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6252; margin-bottom: 3px; }
   .result-album{ font-family:'Archivo Black', sans-serif; font-size: clamp(17px, 4vw, 22px); line-height:1.15; }
   .result-genre{ display:inline-block; font-family:'Space Mono', monospace; font-size: 10px; color: #6b6252; border: 1px solid #6b625244; padding: 2px 8px; border-radius: 20px; margin-top: 4px; }
-  .result-actions{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .spotify-btn{
-    display:inline-flex; align-items:center; gap: 6px; background: #1DB954; color: #06210f;
-    text-decoration:none; font-family:'Space Mono', monospace; font-size: 11px; font-weight:700;
-    padding: 8px 12px; border-radius: 20px; letter-spacing: 0.04em; border:none; cursor:pointer;
-  }
-  .spotify-btn:hover{ filter: brightness(1.08); }
-  .like-btn{
-    display:inline-flex; align-items:center; gap: 6px; background: #fff; color:#1a1710;
-    border: 1px solid #00000022; font-family:'Space Mono', monospace; font-size: 11px; font-weight:700;
-    padding: 8px 12px; border-radius: 20px; cursor:pointer;
-  }
-  .like-btn.liked{ background: var(--vinyl-pink); color:#fff; border-color: var(--vinyl-pink); }
+  .result-hint{ font-family:'Space Mono', monospace; font-size: 10px; color: #8a8065; }
 
   .fade-in{ animation: fadeIn 0.4s ease both; }
   @keyframes fadeIn{ from{ opacity:0; transform: translateY(4px);} to{ opacity:1; transform:none; } }
@@ -195,28 +199,19 @@
   .search-bar:focus{ border-color: var(--vinyl-amber); }
 
   .album-list{ display:flex; flex-direction:column; gap:6px; }
-  .list-wrap{ position:relative; }
-  .fade-mask{
-    display:none; position:absolute; left:0; right:0; bottom:0; height: 46px;
-    background: linear-gradient(to bottom, transparent, var(--bg) 92%);
-    pointer-events:none;
+  .album-row{
+    display:flex; justify-content:space-between; align-items:center;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    padding: 9px 10px; font-size: 13px; gap: 10px; cursor:pointer;
   }
-  .list-wrap.collapsed .fade-mask{ display:block; }
-  .showmore-btn{
-    display:none; width:100%; margin-top: 10px; padding: 10px; border-radius: 8px;
-    border: 1px dashed var(--line); background: none; color: var(--vinyl-amber);
-    font-family:'Space Mono', monospace; font-size: 12px; letter-spacing: 0.05em; cursor:pointer;
-  }
-  .showmore-btn:hover{ border-color: var(--vinyl-amber); background: rgba(232,163,61,0.06); }
-  .showmore-btn.visible{ display:block; }
-  .album-row{ background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow:hidden; }
-  .row-main{ display:flex; justify-content:space-between; align-items:center; padding: 9px 10px; gap: 10px; cursor:pointer; }
-  .row-main .thumb{ width: 34px; height: 34px; border-radius: 5px; background: var(--vinyl-amber); flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; }
-  .row-main .thumb img{ width:100%; height:100%; object-fit:cover; }
-  .row-main .thumb .init{ font-family:'Archivo Black', sans-serif; font-size:12px; color:#1a1710; }
-  .row-main .meta{ flex:1; min-width:0; }
-  .row-main .a{ color: var(--text-muted); font-size:10px; font-family:'Space Mono', monospace; }
-  .row-main .t{ color: var(--paper); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .album-row:hover{ border-color: #4a4550; }
+  .album-row .thumb{ width: 34px; height: 34px; border-radius: 5px; background: var(--vinyl-amber); flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .album-row .thumb img{ width:100%; height:100%; object-fit:cover; }
+  .album-row .thumb .init{ font-family:'Archivo Black', sans-serif; font-size:12px; color:#1a1710; }
+  .album-row .thumb .emoji{ font-size: 16px; }
+  .album-row .meta{ flex:1; min-width:0; }
+  .album-row .a{ color: var(--text-muted); font-size:10px; font-family:'Space Mono', monospace; }
+  .album-row .t{ color: var(--paper); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .row-right{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
   .tag{ font-family:'Space Mono', monospace; font-size: 9px; color: var(--vinyl-amber); border: 1px solid var(--vinyl-amber); padding: 2px 6px; border-radius: 20px; white-space:nowrap; }
   .mini-like{
@@ -228,25 +223,110 @@
   .del-btn{ background:none; border: 1px solid var(--line); color: var(--text-muted); width: 24px; height: 24px; border-radius: 50%; cursor:pointer; font-size: 13px; line-height:1; flex-shrink:0; }
   .del-btn:hover{ border-color: var(--vinyl-red); color: var(--vinyl-red); }
 
-  .comments-panel{ display:none; padding: 10px 12px 14px; border-top: 1px solid var(--line); background:#17151a; }
-  .comments-panel.open{ display:block; }
-  .comment-item{ font-size:12px; color: var(--paper-dim); padding: 6px 0; border-bottom: 1px dashed var(--line); }
-  .comment-item:last-child{ border-bottom:none; }
-  .comment-form{ display:flex; gap:6px; margin-top:8px; }
-  .comment-form input{ flex:1; background:#0f0d12; border: 1px solid var(--line); color: var(--paper); padding: 7px 9px; border-radius: 6px; font-size:12px; }
-  .comment-form button{ background: var(--vinyl-amber); border:none; color:#1a1710; border-radius:6px; padding: 0 12px; font-size:11px; font-family:'Space Mono', monospace; cursor:pointer; }
-  .rate-note{ font-family:'Space Mono', monospace; font-size:10px; color: var(--vinyl-red); margin-top:2px; }
+  .showmore-btn{
+    display:none; width:100%; margin-top: 10px; padding: 10px; border-radius: 8px;
+    border: 1px dashed var(--line); background: none; color: var(--vinyl-amber);
+    font-family:'Space Mono', monospace; font-size: 12px; letter-spacing: 0.05em; cursor:pointer;
+  }
+  .showmore-btn:hover{ border-color: var(--vinyl-amber); background: rgba(232,163,61,0.06); }
+  .showmore-btn.visible{ display:block; }
 
   footer{ margin-top: 40px; font-family:'Space Mono', monospace; font-size: 11px; color: #56515c; text-align:center; }
+
+  /* ---------- Modal (album detail) ---------- */
+  .modal-overlay{
+    display:none; position: fixed; inset:0; background: rgba(8,7,9,0.82);
+    z-index: 100; align-items:flex-start; justify-content:center; overflow-y:auto;
+    padding: 40px 16px;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal-card{
+    width: min(440px, 100%); background: var(--panel-raised); border: 1px solid var(--line);
+    border-radius: 16px; overflow:hidden; position:relative;
+    box-shadow: 0 40px 80px -20px rgba(0,0,0,0.7);
+  }
+  .modal-close{
+    position:absolute; top: 12px; right: 12px; z-index: 5;
+    width: 32px; height: 32px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,0.5); color: var(--paper); font-size: 16px; cursor:pointer;
+  }
+  .modal-art{
+    width:100%; aspect-ratio: 1/1; background: var(--vinyl-amber);
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  .modal-art img{ width:100%; height:100%; object-fit:cover; }
+  .modal-art .init{ font-family:'Archivo Black', sans-serif; font-size: 72px; color:#1a1710; }
+  .modal-art .emoji{ font-size: 110px; }
+  .modal-info{ background: var(--paper); color:#1a1710; padding: 20px; }
+  .modal-artist{ font-family:'Space Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform:uppercase; color:#6b6252; }
+  .modal-album{ font-family:'Archivo Black', sans-serif; font-size: 24px; line-height:1.2; margin: 4px 0 8px; }
+  .modal-genre{ display:inline-block; font-family:'Space Mono', monospace; font-size: 10px; color:#6b6252; border:1px solid #6b625244; padding:2px 8px; border-radius:20px; margin-bottom: 14px; }
+  .modal-actions{ display:flex; gap: 8px; flex-wrap:wrap; }
+  .modal-spotify{
+    display:inline-flex; align-items:center; gap:6px; background:#1DB954; color:#06210f;
+    text-decoration:none; font-family:'Space Mono', monospace; font-size:11px; font-weight:700;
+    padding:9px 14px; border-radius:20px;
+  }
+  .modal-like{
+    display:inline-flex; align-items:center; gap:6px; background:#fff; color:#1a1710;
+    border:1px solid #00000022; font-family:'Space Mono', monospace; font-size:11px; font-weight:700;
+    padding:9px 14px; border-radius:20px; cursor:pointer;
+  }
+  .modal-like.liked{ background: var(--vinyl-pink); color:#fff; border-color: var(--vinyl-pink); }
+
+  .modal-tabs{ display:flex; border-top: 1px solid var(--line); }
+  .modal-tab{
+    flex:1; background: var(--panel); border:none; color: var(--paper-dim);
+    font-family:'Space Mono', monospace; font-size: 12px; padding: 13px 8px; cursor:pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .modal-tab.active{ color: var(--vinyl-amber); border-bottom-color: var(--vinyl-amber); background: var(--panel-raised); }
+  .modal-tab + .modal-tab{ border-left: 1px solid var(--line); }
+
+  .modal-panel{ padding: 16px 18px 20px; background: var(--panel-raised); max-height: 320px; overflow-y:auto; }
+  .comment-item{ font-size:12px; color: var(--paper-dim); padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .comment-item:last-child{ border-bottom:none; }
+  .comment-form{ display:flex; gap:6px; margin-top:10px; }
+  .comment-form input{ flex:1; background:#0f0d12; border: 1px solid var(--line); color: var(--paper); padding: 8px 10px; border-radius: 6px; font-size:12px; }
+  .comment-form button{ background: var(--vinyl-amber); border:none; color:#1a1710; border-radius:6px; padding: 0 14px; font-size:11px; font-family:'Space Mono', monospace; cursor:pointer; }
+  .panel-empty{ font-family:'Space Mono', monospace; font-size:12px; color: var(--text-muted); padding: 10px 0; }
+
+  .talk-item{
+    display:flex; align-items:center; gap:8px; padding: 8px 0; border-bottom: 1px dashed var(--line);
+    font-size: 13px;
+  }
+  .talk-item a{ color: var(--vinyl-blue); text-decoration:none; }
+  .talk-item a:hover{ text-decoration:underline; }
+  .talk-cta{
+    width:100%; margin-top: 12px; padding: 11px; border-radius: 8px; border:none;
+    background: var(--vinyl-amber); color:#1a1710; font-family:'Archivo Black', sans-serif;
+    font-size: 13px; cursor:pointer;
+  }
+  .talk-cta:disabled{ opacity:0.55; cursor:default; }
+  .talk-form{ display:none; gap:8px; margin-top: 10px; }
+  .talk-form.open{ display:flex; }
+  .talk-form input{ flex:1; background:#0f0d12; border: 1px solid var(--line); color: var(--paper); padding: 9px 10px; border-radius: 6px; font-size:12px; }
+  .talk-form button{ background: var(--vinyl-blue); border:none; color:#fff; border-radius:6px; padding: 0 14px; font-size:11px; font-family:'Space Mono', monospace; cursor:pointer; }
+  .talk-note{ font-family:'Space Mono', monospace; font-size:10px; color: var(--text-muted); margin-top:6px; line-height:1.5; }
+
+  /* ---------- How-to modal ---------- */
+  .howto-card{ width: min(380px, 100%); background: var(--paper); color:#1a1710; border-radius:16px; padding: 24px 22px; position:relative; }
+  .howto-card h2{ font-family:'Archivo Black', sans-serif; font-size: 20px; margin: 0 0 14px; }
+  .howto-card p{ font-size: 13px; line-height:1.9; margin: 0 0 10px; }
+  .howto-card .modal-close{ background: rgba(0,0,0,0.1); color:#1a1710; }
 
   @media (prefers-reduced-motion: reduce){ .vinyl.spinning{ animation: none; } .fade-in{ animation: none; } }
 </style>
 </head>
 <body>
 
+  <div class="top-bar">
+    <button class="howto-btn" id="howtoBtn">❓ 使い方</button>
+  </div>
+
   <div class="eyebrow"><span class="conn-dot" id="connDot"></span>RANDOM ACCESS MUSIC</div>
   <h1>今日は何を<span>聴く</span>？</h1>
-  <p class="sub">迷ったらボタンを回すだけ。棚の中からランダムに1枚を引き当てる、音楽版ガチャ。追加・いいね・コメント、みんなで育てる棚。</p>
+  <p class="sub">迷ったらボタンを回すだけ。棚の中からランダムに1枚を引き当てる、音楽版ガチャ。追加・いいね・コメント・話したい、みんなで育てる棚。</p>
 
   <div class="genre-bar" id="genreBar"></div>
 
@@ -295,14 +375,28 @@
 
     <input type="text" class="search-bar" id="searchInput" placeholder="🔍 アーティスト・アルバムで検索…" />
 
-    <div class="list-wrap" id="listWrap">
-      <div class="album-list" id="albumList"></div>
-      <div class="fade-mask" id="fadeMask"></div>
-    </div>
+    <div class="album-list" id="albumList"></div>
     <button class="showmore-btn" id="showMoreBtn"></button>
   </div>
 
-  <footer>RANDOM ACCESS MUSIC — v0.3 (Firebase)</footer>
+  <footer>RANDOM ACCESS MUSIC — v0.4</footer>
+
+  <!-- Album detail modal -->
+  <div class="modal-overlay" id="albumModalOverlay">
+    <div class="modal-card" id="albumModalCard"></div>
+  </div>
+
+  <!-- How-to modal -->
+  <div class="modal-overlay" id="howtoOverlay">
+    <div class="howto-card">
+      <button class="modal-close" id="howtoClose">✕</button>
+      <h2>📼 使い方</h2>
+      <p>🎲 <strong>ルーレットを回す</strong>ボタンを押すと、棚の中からランダムに1枚選んでくれるよ。今日聴く音楽に迷ったらこれ。</p>
+      <p>💿 選ばれたアルバムは自動でポップアップ表示。ジャケットの下から Spotify で聴いたり、❤いいね・💬コメント・🎵話したいができるよ。</p>
+      <p>📚 ライブラリのアルバムをタップしても同じポップアップが開くよ。自分の好きなアルバムも「+ アルバムを追加」からみんなの棚に登録できる（追加・削除は1人につき週1回まで）。</p>
+      <p>🎵 「話したい」でXのIDを登録すると、同じアルバム好きな人同士でDMして繋がれるよ。</p>
+    </div>
+  </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-app-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-auth-compat.min.js"></script>
@@ -331,11 +425,12 @@
     { artist: "Yellow Magic Orchestra", album: "Solid State Survivor", genre: "Electronic" },
     { artist: "Thundercat", album: "Drunk", genre: "Funk" },
     { artist: "Cigarettes After Sex", album: "Cigarettes After Sex", genre: "Dream Pop" },
-    { artist: "平沢進", album: "現象の花園", genre: "Electronic" },
+    { artist: "平沢進", album: "現象の花の秘密", genre: "Electronic" },
     { artist: "Boards of Canada", album: "Music Has the Right to Children", genre: "IDM" },
     { artist: "Basement Jaxx", album: "Kish Kash", genre: "Electronic" },
     { artist: "Error", album: "Cyber Roach (Original Soundtrack)", genre: "Cyberpunk" },
   ];
+  const CYBER_ROACH_KEY = "error|cyber roach (original soundtrack)";
 
   // ---------- DOM refs ----------
   const connDot = document.getElementById('connDot');
@@ -357,24 +452,35 @@
   const albumListEl = document.getElementById('albumList');
   const libCountEl = document.getElementById('libCount');
   const searchInput = document.getElementById('searchInput');
-  const listWrap = document.getElementById('listWrap');
   const showMoreBtn = document.getElementById('showMoreBtn');
+  const albumModalOverlay = document.getElementById('albumModalOverlay');
+  const albumModalCard = document.getElementById('albumModalCard');
+  const howtoBtn = document.getElementById('howtoBtn');
+  const howtoOverlay = document.getElementById('howtoOverlay');
+  const howtoClose = document.getElementById('howtoClose');
 
   let uid = null;
   let albums = [];
   let spinning = false;
   let activeGenre = 'ALL';
-  let expandedId = null;
   let searchQuery = '';
-  let libraryExpanded = false;
+  let libraryMode = 'preview'; // 'preview' | 'expanded'
+  let visibleCount = 10;
   let previewIds = null;
   let lastPreviewKey = '';
   const PREVIEW_COUNT = 3;
+  const PAGE_SIZE = 10;
   const artworkCache = {};
+  const bgTried = new Set();
+
+  let currentModalAlbumId = null;
+  let modalTab = null; // 'comments' | 'talk' | null
 
   function initials(str){ return (str || '').trim().slice(0,1).toUpperCase() || '?'; }
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function spotifyUrl(artist, album){ return `https://open.spotify.com/search/${encodeURIComponent(artist + ' ' + album)}`; }
+  function itemKey(item){ return `${(item.artist||'').trim().toLowerCase()}|${(item.album||'').trim().toLowerCase()}`; }
+  function thumbUrl(url){ return url ? url.replace('600x600bb', '100x100bb') : url; }
 
   // ---------- iTunes JSONP artwork fetch ----------
   let jsonpCounter = 0;
@@ -393,7 +499,7 @@
   }
   async function fetchArtwork(artist, album){
     const key = `${artist}|${album}`;
-    if (key in artworkCache) return artworkCache[key];
+    if (artworkCache[key]) return artworkCache[key]; // only short-circuit on SUCCESS, always retry on prior failure
     try{
       const term = encodeURIComponent(`${artist} ${album}`);
       const data = await itunesJsonp(term);
@@ -402,9 +508,22 @@
         artworkCache[key] = url;
         return url;
       }
-    }catch(e){ /* fall back silently */ }
-    artworkCache[key] = null;
+    }catch(e){ /* fall back silently, will retry next time this is called */ }
     return null;
+  }
+
+  // ---------- background auto-fill of missing artwork (tried once per session per album) ----------
+  async function backgroundFillArtwork(){
+    for (const a of albums){
+      const key = itemKey(a);
+      if (a.artworkUrl || bgTried.has(key) || key === CYBER_ROACH_KEY) continue;
+      bgTried.add(key);
+      const url = await fetchArtwork(a.artist, a.album);
+      if (url){
+        db.collection('albums').doc(a.id).update({ artworkUrl: url }).catch(() => {});
+      }
+      await new Promise(r => setTimeout(r, 250)); // gentle stagger
+    }
   }
 
   // ---------- rate limiting (1 add / 1 delete per 7 days per uid) ----------
@@ -424,7 +543,7 @@
     await ref.set({ [field]: FieldValue.serverTimestamp() }, { merge: true });
   }
 
-  // ---------- seed base albums (only once, guarded by a lock doc to avoid race-condition duplicates) ----------
+  // ---------- seed base albums (guarded by a lock doc to avoid race-condition duplicates) ----------
   async function seedIfEmpty(){
     const lockRef = db.collection('meta').doc('seedStatus');
     const acquired = await db.runTransaction(async (tx) => {
@@ -436,8 +555,52 @@
     if (!acquired) return;
     for (const a of BASE_ALBUMS){
       await db.collection('albums').add({
-        ...a, isBase: true, artworkUrl: null, likes: 0, likedBy: [], createdAt: FieldValue.serverTimestamp()
+        ...a, isBase: true, artworkUrl: null, likes: 0, likedBy: [],
+        commentCount: 0, talkRequests: [], createdAt: FieldValue.serverTimestamp()
       });
+    }
+  }
+
+  // ---------- duplicate cleanup ----------
+  let cleanupLock = false;
+  async function cleanupDuplicates(){
+    if (cleanupLock) return 0;
+    cleanupLock = true;
+    try{
+      const groups = {};
+      albums.forEach(a => {
+        const key = itemKey(a);
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(a);
+      });
+      let removed = 0;
+      for (const key in groups){
+        const dupes = groups[key];
+        if (dupes.length <= 1) continue;
+        dupes.sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
+        const keeper = dupes[0];
+        const mergedLikedBy = new Set(keeper.likedBy || []);
+        let mergedCommentCount = keeper.commentCount || 0;
+        let mergedTalk = [...(keeper.talkRequests || [])];
+        dupes.slice(1).forEach(d => {
+          (d.likedBy || []).forEach(u => mergedLikedBy.add(u));
+          mergedCommentCount += (d.commentCount || 0);
+          (d.talkRequests || []).forEach(t => { if (!mergedTalk.some(m => m.uid === t.uid)) mergedTalk.push(t); });
+        });
+        const mergedArr = [...mergedLikedBy];
+        await db.collection('albums').doc(keeper.id).update({
+          likedBy: mergedArr, likes: mergedArr.length,
+          commentCount: mergedCommentCount, talkRequests: mergedTalk,
+          artworkUrl: keeper.artworkUrl || dupes.slice(1).find(d => d.artworkUrl)?.artworkUrl || null
+        });
+        for (const d of dupes.slice(1)){
+          await db.collection('albums').doc(d.id).delete().catch(() => {});
+          removed++;
+        }
+      }
+      return removed;
+    } finally {
+      cleanupLock = false;
     }
   }
 
@@ -448,22 +611,19 @@
       albums = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       albums.forEach(a => {
         const key = `${a.artist}|${a.album}`;
-        if (a.artworkUrl && !(key in artworkCache)) artworkCache[key] = a.artworkUrl;
+        if (a.artworkUrl && !artworkCache[key]) artworkCache[key] = a.artworkUrl;
       });
       renderGenreBar();
       renderList();
+      if (currentModalAlbumId) renderModal();
 
       if (!autoCleanupTried){
         autoCleanupTried = true;
-        const keys = new Set();
-        const hasDupes = albums.some(a => {
-          const key = `${(a.artist||'').trim().toLowerCase()}|${(a.album||'').trim().toLowerCase()}`;
-          if (keys.has(key)) return true;
-          keys.add(key);
-          return false;
-        });
-        if (hasDupes) setTimeout(() => { cleanupDuplicates(); }, 1500);
+        const seen = new Set();
+        const hasDupes = albums.some(a => { const k = itemKey(a); if (seen.has(k)) return true; seen.add(k); return false; });
+        if (hasDupes) setTimeout(() => cleanupDuplicates(), 1500);
       }
+      backgroundFillArtwork();
     }, (err) => {
       connDot.classList.remove('on');
       albumListEl.innerHTML = `<div class="result-empty">読み込みエラー: ${escapeHtml(err.message)}</div>`;
@@ -511,15 +671,23 @@
       const chip = document.createElement('button');
       chip.className = 'genre-chip' + (g === activeGenre ? ' active' : '');
       chip.textContent = g;
-      chip.addEventListener('click', () => { activeGenre = g; libraryExpanded = false; renderGenreBar(); renderList(); });
+      chip.addEventListener('click', () => {
+        activeGenre = g; libraryMode = 'preview'; visibleCount = PAGE_SIZE;
+        renderGenreBar(); renderList();
+      });
       genreBar.appendChild(chip);
     });
   }
 
-  function labelHtml(item){
+  function isCyberRoach(item){ return itemKey(item) === CYBER_ROACH_KEY; }
+  function likeCount(item){ return (item.likedBy || []).length; }
+  function isLikedByMe(item){ return !!(uid && (item.likedBy || []).includes(uid)); }
+
+  function labelHtml(item, size){
     const key = `${item.artist}|${item.album}`;
     const url = artworkCache[key] || item.artworkUrl;
-    if (url) return `<img src="${url}" alt="" loading="lazy" />`;
+    if (url) return `<img src="${size === 'thumb' ? thumbUrl(url) : url}" alt="" loading="lazy" />`;
+    if (isCyberRoach(item)) return `<span class="emoji">🪳</span>`;
     return `<span class="init">${escapeHtml(initials(item.album))}</span>`;
   }
 
@@ -527,7 +695,7 @@
     const filtered = libraryFiltered();
     libCountEl.textContent = `(${filtered.length}${filtered.length !== albums.length ? ` / ${albums.length}` : ''})`;
 
-    const showList = libraryExpanded ? filtered : pickPreview(filtered);
+    const showList = libraryMode === 'preview' ? pickPreview(filtered) : filtered.slice(0, visibleCount);
     const remaining = filtered.length - showList.length;
 
     albumListEl.innerHTML = '';
@@ -537,28 +705,26 @@
     showList.forEach((item) => {
       const row = document.createElement('div');
       row.className = 'album-row';
+      row.dataset.id = item.id;
       row.innerHTML = `
-        <div class="row-main" data-id="${item.id}">
-          <div class="thumb">${labelHtml(item)}</div>
-          <div class="meta">
-            <div class="a">${escapeHtml(item.artist)}</div>
-            <div class="t">${escapeHtml(item.album)}</div>
-          </div>
-          <div class="row-right">
-            <button class="mini-like ${isLikedByMe(item) ? 'liked' : ''}" data-id="${item.id}" title="いいね">❤ ${likeCount(item)}</button>
-            ${item.genre ? `<span class="tag">${escapeHtml(item.genre)}</span>` : ''}
-            ${!item.isBase ? `<button class="del-btn" data-id="${item.id}" title="削除">×</button>` : ''}
-          </div>
+        <div class="thumb">${labelHtml(item, 'thumb')}</div>
+        <div class="meta">
+          <div class="a">${escapeHtml(item.artist)}</div>
+          <div class="t">${escapeHtml(item.album)}</div>
         </div>
-        <div class="comments-panel ${expandedId === item.id ? 'open' : ''}" id="comments-${item.id}"></div>
+        <div class="row-right">
+          <button class="mini-like ${isLikedByMe(item) ? 'liked' : ''}" data-id="${item.id}" title="いいね">❤ ${likeCount(item)}</button>
+          ${item.genre ? `<span class="tag">${escapeHtml(item.genre)}</span>` : ''}
+          ${!item.isBase ? `<button class="del-btn" data-id="${item.id}" title="削除">×</button>` : ''}
+        </div>
       `;
       albumListEl.appendChild(row);
     });
 
-    albumListEl.querySelectorAll('.row-main').forEach(el => {
+    albumListEl.querySelectorAll('.album-row').forEach(el => {
       el.addEventListener('click', (e) => {
         if (e.target.closest('.del-btn') || e.target.closest('.mini-like')) return;
-        toggleComments(el.dataset.id);
+        openAlbumModal(el.dataset.id);
       });
     });
     albumListEl.querySelectorAll('.del-btn').forEach(btn => {
@@ -574,24 +740,31 @@
       });
     });
 
-    if (expandedId) renderComments(expandedId);
-
-    if (remaining > 0 && !libraryExpanded){
-      listWrap.classList.add('collapsed');
+    if (libraryMode === 'preview' && remaining > 0){
       showMoreBtn.classList.add('visible');
       showMoreBtn.textContent = `▼ もっと見る（残り${remaining}件）`;
-    } else if (libraryExpanded && filtered.length > PREVIEW_COUNT){
-      listWrap.classList.remove('collapsed');
+    } else if (libraryMode === 'expanded' && remaining > 0){
+      showMoreBtn.classList.add('visible');
+      showMoreBtn.textContent = `▼ さらに見る（残り${remaining}件）`;
+    } else if (libraryMode === 'expanded' && filtered.length > PREVIEW_COUNT){
       showMoreBtn.classList.add('visible');
       showMoreBtn.textContent = `▲ 閉じる`;
     } else {
-      listWrap.classList.remove('collapsed');
       showMoreBtn.classList.remove('visible');
     }
   }
 
   showMoreBtn.addEventListener('click', () => {
-    libraryExpanded = !libraryExpanded;
+    if (libraryMode === 'preview'){
+      libraryMode = 'expanded'; visibleCount = PAGE_SIZE;
+    } else {
+      const filtered = libraryFiltered();
+      if (visibleCount >= filtered.length){
+        libraryMode = 'preview'; visibleCount = PAGE_SIZE;
+      } else {
+        visibleCount += PAGE_SIZE;
+      }
+    }
     renderList();
   });
 
@@ -600,51 +773,29 @@
     clearTimeout(searchDebounce);
     searchDebounce = setTimeout(() => {
       searchQuery = searchInput.value.trim();
-      libraryExpanded = false;
+      libraryMode = 'preview'; visibleCount = PAGE_SIZE;
       renderList();
     }, 200);
   });
 
-  async function toggleComments(id){
-    expandedId = expandedId === id ? null : id;
-    renderList();
-  }
-
-  async function renderComments(albumId){
-    const panel = document.getElementById(`comments-${albumId}`);
-    if (!panel) return;
-    panel.classList.add('open');
-    panel.innerHTML = `<div class="comment-item">読み込み中…</div>`;
+  // ---------- likes ----------
+  const likeInFlight = new Set();
+  async function toggleLike(albumId){
+    if (likeInFlight.has(albumId)) return;
+    likeInFlight.add(albumId);
     try{
-      const snap = await db.collection('albums').doc(albumId).collection('comments').orderBy('createdAt', 'desc').get();
-      const comments = snap.docs.map(d => d.data());
-      panel.innerHTML = `
-        ${comments.length ? comments.map(c => `<div class="comment-item">${escapeHtml(c.text)}</div>`).join('') : '<div class="comment-item">まだコメントないよ</div>'}
-        <div class="comment-form">
-          <input type="text" placeholder="一言コメント…" id="commentInput-${albumId}" maxlength="140" />
-          <button id="commentBtn-${albumId}">送信</button>
-        </div>
-      `;
-      document.getElementById(`commentBtn-${albumId}`).addEventListener('click', () => submitComment(albumId));
-      document.getElementById(`commentInput-${albumId}`).addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') submitComment(albumId);
+      const ref = db.collection('albums').doc(albumId);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return;
+        const likedBy = snap.data().likedBy || [];
+        const already = likedBy.includes(uid);
+        const next = already ? likedBy.filter(x => x !== uid) : [...likedBy, uid];
+        tx.update(ref, { likedBy: next, likes: next.length });
       });
-    }catch(e){
-      panel.innerHTML = `<div class="comment-item">読み込みエラー</div>`;
+    } finally {
+      likeInFlight.delete(albumId);
     }
-  }
-
-  async function submitComment(albumId){
-    const input = document.getElementById(`commentInput-${albumId}`);
-    const text = input.value.trim();
-    if (!text) return;
-    input.disabled = true;
-    try{
-      await db.collection('albums').doc(albumId).collection('comments').add({ text, uid, createdAt: FieldValue.serverTimestamp() });
-      input.value = '';
-      renderComments(albumId);
-    }catch(e){ /* ignore */ }
-    input.disabled = false;
   }
 
   async function handleDelete(id){
@@ -658,27 +809,133 @@
     await recordAction('delete');
   }
 
-  function likeCount(item){ return (item.likedBy || []).length; }
-  function isLikedByMe(item){ return !!(uid && (item.likedBy || []).includes(uid)); }
+  // ---------- album detail modal ----------
+  function openAlbumModal(id){
+    currentModalAlbumId = id;
+    modalTab = null;
+    albumModalOverlay.classList.add('open');
+    renderModal();
+  }
+  function closeAlbumModal(){
+    albumModalOverlay.classList.remove('open');
+    currentModalAlbumId = null;
+    modalTab = null;
+  }
+  albumModalOverlay.addEventListener('click', (e) => { if (e.target === albumModalOverlay) closeAlbumModal(); });
 
-  const likeInFlight = new Set();
-  async function toggleLike(albumId){
-    if (likeInFlight.has(albumId)) return; // ignore rapid re-clicks while a request is pending
-    likeInFlight.add(albumId);
+  function renderModal(){
+    const item = albums.find(a => a.id === currentModalAlbumId);
+    if (!item){ closeAlbumModal(); return; }
+    const liked = isLikedByMe(item);
+    const commentCount = item.commentCount || 0;
+    const talkCount = (item.talkRequests || []).length;
+
+    albumModalCard.innerHTML = `
+      <button class="modal-close" id="modalCloseBtn">✕</button>
+      <div class="modal-art">${labelHtml(item, 'full')}</div>
+      <div class="modal-info">
+        <div class="modal-artist">${escapeHtml(item.artist)}</div>
+        <div class="modal-album">${escapeHtml(item.album)}</div>
+        ${item.genre ? `<span class="modal-genre">${escapeHtml(item.genre)}</span>` : ''}
+        <div class="modal-actions">
+          <a class="modal-spotify" href="${spotifyUrl(item.artist, item.album)}" target="_blank" rel="noopener noreferrer">▶ Spotifyで聴く</a>
+          <button class="modal-like ${liked ? 'liked' : ''}" id="modalLikeBtn">❤ ${likeCount(item)}</button>
+        </div>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab ${modalTab === 'comments' ? 'active' : ''}" id="tabComments">💬 コメント (${commentCount})</button>
+        <button class="modal-tab ${modalTab === 'talk' ? 'active' : ''}" id="tabTalk">🎵 話したい (${talkCount})</button>
+      </div>
+      ${modalTab ? `<div class="modal-panel" id="modalPanel"></div>` : ''}
+    `;
+
+    document.getElementById('modalCloseBtn').addEventListener('click', closeAlbumModal);
+    document.getElementById('modalLikeBtn').addEventListener('click', () => toggleLike(item.id));
+    document.getElementById('tabComments').addEventListener('click', () => { modalTab = modalTab === 'comments' ? null : 'comments'; renderModal(); });
+    document.getElementById('tabTalk').addEventListener('click', () => { modalTab = modalTab === 'talk' ? null : 'talk'; renderModal(); });
+
+    if (modalTab === 'comments') renderCommentsPanel(item);
+    if (modalTab === 'talk') renderTalkPanel(item);
+  }
+
+  async function renderCommentsPanel(item){
+    const panel = document.getElementById('modalPanel');
+    if (!panel) return;
+    panel.innerHTML = `<div class="panel-empty">読み込み中…</div>`;
     try{
-      const ref = db.collection('albums').doc(albumId);
-      await db.runTransaction(async (tx) => {
-        const snap = await tx.get(ref);
-        if (!snap.exists) return;
-        const likedBy = snap.data().likedBy || [];
-        const already = likedBy.includes(uid);
-        const nextLikedBy = already ? likedBy.filter(x => x !== uid) : [...likedBy, uid];
-        tx.update(ref, { likedBy: nextLikedBy, likes: nextLikedBy.length });
-      });
-    } finally {
-      likeInFlight.delete(albumId);
+      const snap = await db.collection('albums').doc(item.id).collection('comments').orderBy('createdAt', 'desc').get();
+      const comments = snap.docs.map(d => d.data());
+      panel.innerHTML = `
+        ${comments.length ? comments.map(c => `<div class="comment-item">${escapeHtml(c.text)}</div>`).join('') : '<div class="panel-empty">まだコメントないよ、最初の1件書いてみる？</div>'}
+        <div class="comment-form">
+          <input type="text" placeholder="一言コメント…" id="modalCommentInput" maxlength="140" />
+          <button id="modalCommentBtn">送信</button>
+        </div>
+      `;
+      document.getElementById('modalCommentBtn').addEventListener('click', () => submitComment(item.id));
+      document.getElementById('modalCommentInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitComment(item.id); });
+    }catch(e){
+      panel.innerHTML = `<div class="panel-empty">読み込みエラー</div>`;
     }
   }
+
+  async function submitComment(albumId){
+    const input = document.getElementById('modalCommentInput');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    input.disabled = true;
+    try{
+      await db.collection('albums').doc(albumId).collection('comments').add({ text, uid, createdAt: FieldValue.serverTimestamp() });
+      await db.collection('albums').doc(albumId).update({ commentCount: FieldValue.increment(1) });
+      input.value = '';
+      const item = albums.find(a => a.id === albumId);
+      if (item) renderCommentsPanel(item);
+    }catch(e){ /* ignore */ }
+    input.disabled = false;
+  }
+
+  function renderTalkPanel(item){
+    const panel = document.getElementById('modalPanel');
+    if (!panel) return;
+    const talk = item.talkRequests || [];
+    const already = uid && talk.some(t => t.uid === uid);
+    panel.innerHTML = `
+      ${talk.length ? talk.map(t => `<div class="talk-item">🔗 <a href="https://x.com/${escapeHtml(t.handle)}" target="_blank" rel="noopener noreferrer">@${escapeHtml(t.handle)}</a></div>`).join('') : '<div class="panel-empty">まだ誰も登録してないよ、最初の1人になる？</div>'}
+      <button class="talk-cta" id="talkCtaBtn" ${already ? 'disabled' : ''}>${already ? '✓ 登録済み' : '🧡 話したい！'}</button>
+      <div class="talk-form" id="talkForm">
+        <input type="text" placeholder="Xのユーザー名（@なし）" id="talkHandleInput" maxlength="30" />
+        <button id="talkSubmitBtn">登録</button>
+      </div>
+      <div class="talk-note">※ 入力したXユーザー名はこのアルバムを見た人全員に公開されるよ。本人確認はしてないから、なりすまし防止のため慎重にね🙏</div>
+    `;
+    if (!already){
+      document.getElementById('talkCtaBtn').addEventListener('click', () => {
+        document.getElementById('talkForm').classList.add('open');
+      });
+      document.getElementById('talkSubmitBtn').addEventListener('click', () => submitTalk(item.id));
+      document.getElementById('talkHandleInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitTalk(item.id); });
+    }
+  }
+
+  async function submitTalk(albumId){
+    const input = document.getElementById('talkHandleInput');
+    if (!input) return;
+    let handle = input.value.trim().replace(/^@/, '');
+    if (!handle) return;
+    input.disabled = true;
+    try{
+      await db.collection('albums').doc(albumId).update({
+        talkRequests: FieldValue.arrayUnion({ uid, handle })
+      });
+    }catch(e){ /* ignore */ }
+    input.disabled = false;
+  }
+
+  // ---------- how-to modal ----------
+  howtoBtn.addEventListener('click', () => howtoOverlay.classList.add('open'));
+  howtoClose.addEventListener('click', () => howtoOverlay.classList.remove('open'));
+  howtoOverlay.addEventListener('click', (e) => { if (e.target === howtoOverlay) howtoOverlay.classList.remove('open'); });
 
   // ---------- spin ----------
   async function spin(){
@@ -702,71 +959,35 @@
     const url = await artworkPromise;
     if (url && !pick.artworkUrl){
       db.collection('albums').doc(pick.id).update({ artworkUrl: url }).catch(()=>{});
+      pick.artworkUrl = url;
     }
 
     vinyl.classList.remove('spinning');
     tonearm.classList.remove('down');
     statusPill.textContent = 'PLAYING';
-    vinylLabel.innerHTML = labelHtml(pick);
+    vinylLabel.innerHTML = labelHtml(pick, 'full');
 
-    const liked = isLikedByMe(pick);
     resultCard.innerHTML = `
       <div class="result-top fade-in">
-        <div class="result-art">${labelHtml(pick)}</div>
+        <div class="result-art">${labelHtml(pick, 'thumb')}</div>
         <div class="result-text">
           <div class="result-artist">${escapeHtml(pick.artist)}</div>
           <div class="result-album">${escapeHtml(pick.album)}</div>
           ${pick.genre ? `<span class="result-genre">${escapeHtml(pick.genre)}</span>` : ''}
         </div>
       </div>
-      <div class="result-actions fade-in">
-        <a class="spotify-btn" href="${spotifyUrl(pick.artist, pick.album)}" target="_blank" rel="noopener noreferrer">▶ Spotifyで聴く</a>
-        <button class="like-btn ${liked ? 'liked' : ''}" id="resultLikeBtn">❤ ${likeCount(pick)}</button>
-      </div>
+      <div class="result-hint fade-in">タップして詳細を開く ▶</div>
     `;
-    document.getElementById('resultLikeBtn').addEventListener('click', () => toggleLike(pick.id));
+    resultCard.onclick = () => openAlbumModal(pick.id);
 
     spinning = false;
     spinBtn.disabled = false;
+
+    openAlbumModal(pick.id);
   }
 
   spinBtn.addEventListener('click', spin);
   addToggle.addEventListener('click', () => addForm.classList.toggle('open'));
-
-  let cleanupLock = false;
-  async function cleanupDuplicates(){
-    if (cleanupLock) return 0;
-    cleanupLock = true;
-    try{
-      const groups = {};
-      albums.forEach(a => {
-        const key = `${(a.artist||'').trim().toLowerCase()}|${(a.album||'').trim().toLowerCase()}`;
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(a);
-      });
-      let removed = 0;
-      for (const key in groups){
-        const dupes = groups[key];
-        if (dupes.length <= 1) continue;
-        dupes.sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
-        const keeper = dupes[0];
-        const mergedLikedBy = new Set(keeper.likedBy || []);
-        dupes.slice(1).forEach(d => (d.likedBy || []).forEach(u => mergedLikedBy.add(u)));
-        const mergedArr = [...mergedLikedBy];
-        await db.collection('albums').doc(keeper.id).update({
-          likedBy: mergedArr, likes: mergedArr.length,
-          artworkUrl: keeper.artworkUrl || dupes.slice(1).find(d => d.artworkUrl)?.artworkUrl || null
-        });
-        for (const d of dupes.slice(1)){
-          await db.collection('albums').doc(d.id).delete().catch(() => {});
-          removed++;
-        }
-      }
-      return removed;
-    } finally {
-      cleanupLock = false;
-    }
-  }
 
   cleanupBtn.addEventListener('click', async () => {
     cleanupBtn.disabled = true;
@@ -799,6 +1020,7 @@
     await db.collection('albums').add({
       artist, album, genre: genre || 'その他', isBase: false,
       artworkUrl: artworkUrl || null, likes: 0, likedBy: [],
+      commentCount: 0, talkRequests: [],
       addedBy: uid, createdAt: FieldValue.serverTimestamp()
     });
     await recordAction('add');
