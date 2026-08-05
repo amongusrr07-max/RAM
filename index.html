@@ -185,7 +185,29 @@
   .add-form button:disabled{ opacity: 0.6; cursor: default; }
   .form-note{ font-size:11px; color: var(--text-muted); line-height:1.5; }
 
-  .album-list{ display:flex; flex-direction:column; gap:6px; max-height: 420px; overflow-y:auto; }
+  .search-bar{
+    width:100%; background: var(--panel); border: 1px solid var(--line); color: var(--paper);
+    padding: 10px 14px; border-radius: 8px; font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 14px; margin-bottom: 12px;
+  }
+  .search-bar::placeholder{ color: var(--text-muted); }
+  .search-bar:focus{ border-color: var(--vinyl-amber); }
+
+  .album-list{ display:flex; flex-direction:column; gap:6px; }
+  .list-wrap{ position:relative; }
+  .fade-mask{
+    display:none; position:absolute; left:0; right:0; bottom:0; height: 46px;
+    background: linear-gradient(to bottom, transparent, var(--bg) 92%);
+    pointer-events:none;
+  }
+  .list-wrap.collapsed .fade-mask{ display:block; }
+  .showmore-btn{
+    display:none; width:100%; margin-top: 10px; padding: 10px; border-radius: 8px;
+    border: 1px dashed var(--line); background: none; color: var(--vinyl-amber);
+    font-family:'Space Mono', monospace; font-size: 12px; letter-spacing: 0.05em; cursor:pointer;
+  }
+  .showmore-btn:hover{ border-color: var(--vinyl-amber); background: rgba(232,163,61,0.06); }
+  .showmore-btn.visible{ display:block; }
   .album-row{ background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow:hidden; }
   .row-main{ display:flex; justify-content:space-between; align-items:center; padding: 9px 10px; gap: 10px; cursor:pointer; }
   .row-main .thumb{ width: 34px; height: 34px; border-radius: 5px; background: var(--vinyl-amber); flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; }
@@ -262,7 +284,13 @@
       <div class="form-note" id="formNote">※ ジャケット画像はiTunesから自動取得するよ。追加は1人につき週1回まで。みんなの棚に反映されるよ🌍</div>
     </div>
 
-    <div class="album-list" id="albumList"></div>
+    <input type="text" class="search-bar" id="searchInput" placeholder="🔍 アーティスト・アルバムで検索…" />
+
+    <div class="list-wrap" id="listWrap">
+      <div class="album-list" id="albumList"></div>
+      <div class="fade-mask" id="fadeMask"></div>
+    </div>
+    <button class="showmore-btn" id="showMoreBtn"></button>
   </div>
 
   <footer>RANDOM ACCESS MUSIC — v0.3 (Firebase)</footer>
@@ -318,12 +346,20 @@
   const formNote = document.getElementById('formNote');
   const albumListEl = document.getElementById('albumList');
   const libCountEl = document.getElementById('libCount');
+  const searchInput = document.getElementById('searchInput');
+  const listWrap = document.getElementById('listWrap');
+  const showMoreBtn = document.getElementById('showMoreBtn');
 
   let uid = null;
   let albums = [];
   let spinning = false;
   let activeGenre = 'ALL';
   let expandedId = null;
+  let searchQuery = '';
+  let libraryExpanded = false;
+  let previewIds = null;
+  let lastPreviewKey = '';
+  const PREVIEW_COUNT = 3;
   const artworkCache = {};
 
   function initials(str){ return (str || '').trim().slice(0,1).toUpperCase() || '?'; }
@@ -378,10 +414,16 @@
     await ref.set({ [field]: FieldValue.serverTimestamp() }, { merge: true });
   }
 
-  // ---------- seed base albums (only once, if collection empty) ----------
+  // ---------- seed base albums (only once, guarded by a lock doc to avoid race-condition duplicates) ----------
   async function seedIfEmpty(){
-    const snap = await db.collection('albums').get();
-    if (!snap.empty) return;
+    const lockRef = db.collection('meta').doc('seedStatus');
+    const acquired = await db.runTransaction(async (tx) => {
+      const lockSnap = await tx.get(lockRef);
+      if (lockSnap.exists) return false;
+      tx.set(lockRef, { seededAt: FieldValue.serverTimestamp() });
+      return true;
+    });
+    if (!acquired) return;
     for (const a of BASE_ALBUMS){
       await db.collection('albums').add({
         ...a, isBase: true, artworkUrl: null, likes: 0, likedBy: [], createdAt: FieldValue.serverTimestamp()
@@ -410,6 +452,35 @@
     return albums.filter(a => a.genre === activeGenre);
   }
 
+  function matchesSearch(a){
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (a.artist || '').toLowerCase().includes(q) || (a.album || '').toLowerCase().includes(q);
+  }
+
+  function libraryFiltered(){
+    return albums.filter(a => (activeGenre === 'ALL' || a.genre === activeGenre) && matchesSearch(a));
+  }
+
+  function pickPreview(filtered){
+    const key = activeGenre + '|' + searchQuery;
+    if (key !== lastPreviewKey || !previewIds){
+      lastPreviewKey = key;
+      const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+      previewIds = shuffled.slice(0, PREVIEW_COUNT).map(a => a.id);
+    }
+    let preview = previewIds.map(id => filtered.find(a => a.id === id)).filter(Boolean);
+    if (preview.length < Math.min(PREVIEW_COUNT, filtered.length)){
+      const used = new Set(preview.map(a => a.id));
+      const extra = filtered.filter(a => !used.has(a.id))
+        .sort(() => Math.random() - 0.5)
+        .slice(0, Math.min(PREVIEW_COUNT, filtered.length) - preview.length);
+      preview = preview.concat(extra);
+      previewIds = preview.map(a => a.id);
+    }
+    return preview;
+  }
+
   function renderGenreBar(){
     const genres = ['ALL', ...new Set(albums.map(a => a.genre).filter(Boolean))];
     genreBar.innerHTML = '';
@@ -417,7 +488,7 @@
       const chip = document.createElement('button');
       chip.className = 'genre-chip' + (g === activeGenre ? ' active' : '');
       chip.textContent = g;
-      chip.addEventListener('click', () => { activeGenre = g; renderGenreBar(); });
+      chip.addEventListener('click', () => { activeGenre = g; libraryExpanded = false; renderGenreBar(); renderList(); });
       genreBar.appendChild(chip);
     });
   }
@@ -430,9 +501,17 @@
   }
 
   function renderList(){
-    libCountEl.textContent = `(${albums.length})`;
+    const filtered = libraryFiltered();
+    libCountEl.textContent = `(${filtered.length}${filtered.length !== albums.length ? ` / ${albums.length}` : ''})`;
+
+    const showList = libraryExpanded ? filtered : pickPreview(filtered);
+    const remaining = filtered.length - showList.length;
+
     albumListEl.innerHTML = '';
-    albums.forEach((item) => {
+    if (filtered.length === 0){
+      albumListEl.innerHTML = `<div class="result-empty">見つからなかった…条件を変えてみて🔍</div>`;
+    }
+    showList.forEach((item) => {
       const row = document.createElement('div');
       row.className = 'album-row';
       row.innerHTML = `
@@ -467,7 +546,35 @@
     });
 
     if (expandedId) renderComments(expandedId);
+
+    if (remaining > 0 && !libraryExpanded){
+      listWrap.classList.add('collapsed');
+      showMoreBtn.classList.add('visible');
+      showMoreBtn.textContent = `▼ もっと見る（残り${remaining}件）`;
+    } else if (libraryExpanded && filtered.length > PREVIEW_COUNT){
+      listWrap.classList.remove('collapsed');
+      showMoreBtn.classList.add('visible');
+      showMoreBtn.textContent = `▲ 閉じる`;
+    } else {
+      listWrap.classList.remove('collapsed');
+      showMoreBtn.classList.remove('visible');
+    }
   }
+
+  showMoreBtn.addEventListener('click', () => {
+    libraryExpanded = !libraryExpanded;
+    renderList();
+  });
+
+  let searchDebounce;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+      searchQuery = searchInput.value.trim();
+      libraryExpanded = false;
+      renderList();
+    }, 200);
+  });
 
   async function toggleComments(id){
     expandedId = expandedId === id ? null : id;
