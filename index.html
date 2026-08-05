@@ -173,6 +173,7 @@
   .library{ width: min(420px, 92vw); margin-top: 34px; }
   .lib-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; }
   .lib-title{ font-family:'Space Mono', monospace; font-size: 12px; letter-spacing: 0.16em; color: var(--text-muted); text-transform:uppercase; }
+  .lib-head-actions{ display:flex; gap: 8px; }
   .add-toggle{ background:none; border: 1px solid var(--line); color: var(--paper-dim); font-family:'Space Mono', monospace; font-size: 11px; padding: 6px 10px; border-radius: 6px; cursor:pointer; }
   .add-toggle:hover{ border-color: var(--vinyl-amber); color: var(--vinyl-amber); }
 
@@ -218,7 +219,12 @@
   .row-main .t{ color: var(--paper); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .row-right{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
   .tag{ font-family:'Space Mono', monospace; font-size: 9px; color: var(--vinyl-amber); border: 1px solid var(--vinyl-amber); padding: 2px 6px; border-radius: 20px; white-space:nowrap; }
-  .mini-like{ font-family:'Space Mono', monospace; font-size: 10px; color: var(--vinyl-pink); }
+  .mini-like{
+    font-family:'Space Mono', monospace; font-size: 10px; color: var(--text-muted);
+    background: none; border: 1px solid var(--line); border-radius: 20px; padding: 3px 8px; cursor:pointer;
+  }
+  .mini-like.liked{ color: var(--vinyl-pink); border-color: var(--vinyl-pink); }
+  .mini-like:hover{ border-color: var(--vinyl-pink); color: var(--vinyl-pink); }
   .del-btn{ background:none; border: 1px solid var(--line); color: var(--text-muted); width: 24px; height: 24px; border-radius: 50%; cursor:pointer; font-size: 13px; line-height:1; flex-shrink:0; }
   .del-btn:hover{ border-color: var(--vinyl-red); color: var(--vinyl-red); }
 
@@ -273,7 +279,10 @@
   <div class="library">
     <div class="lib-head">
       <span class="lib-title">Library <span id="libCount"></span></span>
-      <button class="add-toggle" id="addToggle">+ アルバムを追加</button>
+      <div class="lib-head-actions">
+        <button class="add-toggle" id="cleanupBtn" title="重複してるアルバムをまとめる">🧹 整理</button>
+        <button class="add-toggle" id="addToggle">+ アルバムを追加</button>
+      </div>
     </div>
 
     <div class="add-form" id="addForm">
@@ -338,6 +347,7 @@
   const resultCard = document.getElementById('resultCard');
   const spinBtn = document.getElementById('spinBtn');
   const addToggle = document.getElementById('addToggle');
+  const cleanupBtn = document.getElementById('cleanupBtn');
   const addForm = document.getElementById('addForm');
   const addBtn = document.getElementById('addBtn');
   const inArtist = document.getElementById('inArtist');
@@ -432,6 +442,7 @@
   }
 
   // ---------- realtime library listener ----------
+  let autoCleanupTried = false;
   function listenLibrary(){
     db.collection('albums').orderBy('createdAt', 'asc').onSnapshot((snap) => {
       albums = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -441,6 +452,18 @@
       });
       renderGenreBar();
       renderList();
+
+      if (!autoCleanupTried){
+        autoCleanupTried = true;
+        const keys = new Set();
+        const hasDupes = albums.some(a => {
+          const key = `${(a.artist||'').trim().toLowerCase()}|${(a.album||'').trim().toLowerCase()}`;
+          if (keys.has(key)) return true;
+          keys.add(key);
+          return false;
+        });
+        if (hasDupes) setTimeout(() => { cleanupDuplicates(); }, 1500);
+      }
     }, (err) => {
       connDot.classList.remove('on');
       albumListEl.innerHTML = `<div class="result-empty">読み込みエラー: ${escapeHtml(err.message)}</div>`;
@@ -522,7 +545,7 @@
             <div class="t">${escapeHtml(item.album)}</div>
           </div>
           <div class="row-right">
-            ${item.likes ? `<span class="mini-like">❤ ${item.likes}</span>` : ''}
+            <button class="mini-like ${isLikedByMe(item) ? 'liked' : ''}" data-id="${item.id}" title="いいね">❤ ${likeCount(item)}</button>
             ${item.genre ? `<span class="tag">${escapeHtml(item.genre)}</span>` : ''}
             ${!item.isBase ? `<button class="del-btn" data-id="${item.id}" title="削除">×</button>` : ''}
           </div>
@@ -534,7 +557,7 @@
 
     albumListEl.querySelectorAll('.row-main').forEach(el => {
       el.addEventListener('click', (e) => {
-        if (e.target.closest('.del-btn')) return;
+        if (e.target.closest('.del-btn') || e.target.closest('.mini-like')) return;
         toggleComments(el.dataset.id);
       });
     });
@@ -542,6 +565,12 @@
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         await handleDelete(btn.dataset.id);
+      });
+    });
+    albumListEl.querySelectorAll('.mini-like').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleLike(btn.dataset.id);
       });
     });
 
@@ -629,12 +658,26 @@
     await recordAction('delete');
   }
 
-  async function toggleLike(albumId, currentlyLiked){
-    const ref = db.collection('albums').doc(albumId);
-    await ref.update({
-      likes: FieldValue.increment(currentlyLiked ? -1 : 1),
-      likedBy: currentlyLiked ? FieldValue.arrayRemove(uid) : FieldValue.arrayUnion(uid)
-    });
+  function likeCount(item){ return (item.likedBy || []).length; }
+  function isLikedByMe(item){ return !!(uid && (item.likedBy || []).includes(uid)); }
+
+  const likeInFlight = new Set();
+  async function toggleLike(albumId){
+    if (likeInFlight.has(albumId)) return; // ignore rapid re-clicks while a request is pending
+    likeInFlight.add(albumId);
+    try{
+      const ref = db.collection('albums').doc(albumId);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return;
+        const likedBy = snap.data().likedBy || [];
+        const already = likedBy.includes(uid);
+        const nextLikedBy = already ? likedBy.filter(x => x !== uid) : [...likedBy, uid];
+        tx.update(ref, { likedBy: nextLikedBy, likes: nextLikedBy.length });
+      });
+    } finally {
+      likeInFlight.delete(albumId);
+    }
   }
 
   // ---------- spin ----------
@@ -666,7 +709,7 @@
     statusPill.textContent = 'PLAYING';
     vinylLabel.innerHTML = labelHtml(pick);
 
-    const liked = uid && (pick.likedBy || []).includes(uid);
+    const liked = isLikedByMe(pick);
     resultCard.innerHTML = `
       <div class="result-top fade-in">
         <div class="result-art">${labelHtml(pick)}</div>
@@ -678,13 +721,10 @@
       </div>
       <div class="result-actions fade-in">
         <a class="spotify-btn" href="${spotifyUrl(pick.artist, pick.album)}" target="_blank" rel="noopener noreferrer">▶ Spotifyで聴く</a>
-        <button class="like-btn ${liked ? 'liked' : ''}" id="resultLikeBtn">❤ ${pick.likes || 0}</button>
+        <button class="like-btn ${liked ? 'liked' : ''}" id="resultLikeBtn">❤ ${likeCount(pick)}</button>
       </div>
     `;
-    document.getElementById('resultLikeBtn').addEventListener('click', async (e) => {
-      const isLiked = e.target.classList.contains('liked');
-      await toggleLike(pick.id, isLiked);
-    });
+    document.getElementById('resultLikeBtn').addEventListener('click', () => toggleLike(pick.id));
 
     spinning = false;
     spinBtn.disabled = false;
@@ -692,6 +732,53 @@
 
   spinBtn.addEventListener('click', spin);
   addToggle.addEventListener('click', () => addForm.classList.toggle('open'));
+
+  let cleanupLock = false;
+  async function cleanupDuplicates(){
+    if (cleanupLock) return 0;
+    cleanupLock = true;
+    try{
+      const groups = {};
+      albums.forEach(a => {
+        const key = `${(a.artist||'').trim().toLowerCase()}|${(a.album||'').trim().toLowerCase()}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(a);
+      });
+      let removed = 0;
+      for (const key in groups){
+        const dupes = groups[key];
+        if (dupes.length <= 1) continue;
+        dupes.sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
+        const keeper = dupes[0];
+        const mergedLikedBy = new Set(keeper.likedBy || []);
+        dupes.slice(1).forEach(d => (d.likedBy || []).forEach(u => mergedLikedBy.add(u)));
+        const mergedArr = [...mergedLikedBy];
+        await db.collection('albums').doc(keeper.id).update({
+          likedBy: mergedArr, likes: mergedArr.length,
+          artworkUrl: keeper.artworkUrl || dupes.slice(1).find(d => d.artworkUrl)?.artworkUrl || null
+        });
+        for (const d of dupes.slice(1)){
+          await db.collection('albums').doc(d.id).delete().catch(() => {});
+          removed++;
+        }
+      }
+      return removed;
+    } finally {
+      cleanupLock = false;
+    }
+  }
+
+  cleanupBtn.addEventListener('click', async () => {
+    cleanupBtn.disabled = true;
+    cleanupBtn.textContent = '整理中…';
+    try{
+      const removed = await cleanupDuplicates();
+      cleanupBtn.textContent = removed > 0 ? `✅ ${removed}件まとめた` : '重複なし';
+    }catch(e){
+      cleanupBtn.textContent = 'エラー';
+    }
+    setTimeout(() => { cleanupBtn.disabled = false; cleanupBtn.textContent = '🧹 整理'; }, 2500);
+  });
 
   addBtn.addEventListener('click', async () => {
     const artist = inArtist.value.trim();
